@@ -1,0 +1,16 @@
+# Entorno y dependencias
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Secretos (las claves van en .env, nunca en git)
+.env
+
+# Datos generados al ejecutar
+data/registro.db
+data/posiciones.json
+data/*.tmp
+
+# Sistema
+.DS_Store

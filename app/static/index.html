@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SmartBus">
+<title>SmartBus Asistente</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-2: #f2f2f7;
+    --text: #0b0b0f;
+    --text-2: #6e6e73;
+    --text-3: #aeaeb2;
+    --sep: rgba(60, 60, 67, .13);
+    --bar: rgba(255, 255, 255, .62);
+    --bar-border: rgba(0, 0, 0, .06);
+    --bubble-bot: #f0f0f5;
+    --card: #ffffff;
+    --card-border: rgba(0, 0, 0, .06);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 10px 30px rgba(0, 0, 0, .07);
+    --accent: #0a84ff;
+    --green: #22c55e;
+    --amber: #ff9f0a;
+    --grad: linear-gradient(135deg, #1ec97e 0%, #0a84ff 100%);
+    --grad-soft: linear-gradient(135deg, rgba(30, 201, 126, .14), rgba(10, 132, 255, .14));
+    --blob-a: rgba(30, 201, 126, .20);
+    --blob-b: rgba(10, 132, 255, .18);
+    --outer: #e9e9ef;
+    --ease: cubic-bezier(.32, .72, 0, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000;
+      --bg-2: #1c1c1e;
+      --text: #f5f5f7;
+      --text-2: #98989f;
+      --text-3: #636366;
+      --sep: rgba(84, 84, 88, .45);
+      --bar: rgba(18, 18, 20, .62);
+      --bar-border: rgba(255, 255, 255, .07);
+      --bubble-bot: #1c1c1e;
+      --card: #1c1c1e;
+      --card-border: rgba(255, 255, 255, .07);
+      --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 10px 30px rgba(0, 0, 0, .45);
+      --blob-a: rgba(30, 201, 126, .16);
+      --blob-b: rgba(10, 132, 255, .18);
+      --outer: #0d0d0f;
+    }
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+  svg { display: block; }
+
+  /* ---------- contenedor tipo app ---------- */
+  /* La página entera hace scroll (no un contenedor interno): así Safari en iPhone dibuja el
+     contenido detrás de la barra de estado y de su barra flotante, de borde a borde. */
+  .app { position: relative; min-height: 100dvh; max-width: 480px; margin: 0 auto; isolation: isolate;
+         background: radial-gradient(140% 420px at 0% 0%, var(--blob-a), transparent 70%),
+                     radial-gradient(140% 420px at 100% 100%, var(--blob-b), transparent 70%), var(--bg); }
+  @media (min-width: 560px) {
+    body { background: var(--outer); }
+    .app { box-shadow: 0 0 0 .5px var(--bar-border), 0 30px 80px rgba(0, 0, 0, .12); }
+  }
+
+  /* luz ambiental: manchas de color muy suaves detrás de todo */
+  .ambient { position: fixed; inset: 0; max-width: 480px; margin: 0 auto; z-index: -1; pointer-events: none; overflow: hidden; }
+  .ambient i { position: absolute; width: 360px; height: 360px; border-radius: 50%; filter: blur(70px); }
+  .ambient i:nth-child(1) { background: var(--blob-a); top: -120px; left: -120px; animation: deriva 18s ease-in-out infinite alternate; }
+  .ambient i:nth-child(2) { background: var(--blob-b); bottom: -140px; right: -140px; animation: deriva 22s ease-in-out infinite alternate-reverse; }
+  @keyframes deriva { to { transform: translate(60px, 40px) scale(1.1); } }
+
+  /* ---------- barras translúcidas (el contenido pasa por debajo y las tiñe) ---------- */
+  /* En iPhone, Safari 26 rellena la barra de estado y la zona de sus botones con el color de
+     fondo de las barras fijas que tocan el borde. Por eso las barras no tienen fondo propio:
+     el vidrio está en un pseudo-elemento que se extiende 160px más allá del borde, por detrás
+     de la barra de estado (arriba) y de la barra flotante de Safari (abajo). */
+  .bar { position: fixed; left: 0; right: 0; max-width: 480px; margin: 0 auto; z-index: 5; background: transparent; isolation: isolate; pointer-events: none; }
+  /* Experimento para Safari 26: la barra no recibe toques en sus bordes (solo su contenido),
+     así Safari no la toma como "el elemento del borde" y deja ver la página detrás. */
+  .bar > * { pointer-events: auto; }
+  .bar::before {
+    content: ""; position: absolute; left: 0; right: 0; z-index: -1; pointer-events: none;
+    background: var(--bar);
+    -webkit-backdrop-filter: saturate(190%) blur(22px); backdrop-filter: saturate(190%) blur(22px);
+  }
+  .bar.top { top: 0; padding: max(12px, env(safe-area-inset-top)) 16px 12px; }
+  .bar.top::before { top: -160px; bottom: 0; border-bottom: .5px solid var(--bar-border); }
+  .bar.bottom { bottom: 0; padding: 8px 0 max(10px, env(safe-area-inset-bottom)); }
+  .bar.bottom::before { top: 0; bottom: -160px; border-top: .5px solid var(--bar-border); }
+
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .logo { width: 36px; height: 36px; border-radius: 11px; background: var(--grad); color: #fff; display: grid; place-items: center; box-shadow: 0 4px 12px rgba(10, 132, 255, .28); flex: none; }
+  .logo svg { width: 20px; height: 20px; }
+  h1 { font-size: 17px; font-weight: 650; letter-spacing: -.01em; margin: 0; }
+  .sub { margin: 1px 0 0; font-size: 12.5px; color: var(--text-2); display: flex; align-items: center; gap: 6px; }
+  .live { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 rgba(34, 197, 94, .6); animation: latido 2.4s infinite; }
+  @keyframes latido { 0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, .55); } 70% { box-shadow: 0 0 0 7px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
+  .icon-btn { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: var(--text-2); background: var(--bg-2); transition: transform .2s var(--ease); }
+  .icon-btn:active { transform: scale(.92); }
+  .icon-btn svg { width: 19px; height: 19px; }
+
+  .trip {
+    margin-top: 12px; width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
+    padding: 9px 12px; border-radius: 14px; background: var(--grad-soft); border: .5px solid var(--bar-border);
+    transition: transform .25s var(--ease);
+  }
+  .trip:active { transform: scale(.985); }
+  .trip .pin { width: 30px; height: 30px; border-radius: 9px; background: var(--card); display: grid; place-items: center; color: var(--accent); box-shadow: 0 1px 3px rgba(0, 0, 0, .08); flex: none; }
+  .trip .pin svg { width: 17px; height: 17px; }
+  .trip-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .trip-text b { font-size: 14.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .trip-text span { font-size: 12.5px; color: var(--text-2); display: flex; align-items: center; gap: 4px; }
+  .trip-text span svg { width: 13px; height: 13px; }
+  .trip > svg { width: 18px; height: 18px; color: var(--text-3); flex: none; }
+
+  /* ---------- conversación ---------- */
+  .chat {
+    min-height: 100dvh;
+    padding: calc(var(--top-h, 130px) + 14px) 14px calc(var(--bottom-h, 120px) + 14px);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .hero { text-align: center; padding: 28px 18px 18px; animation: entra .6s var(--ease) both; }
+  .hero-logo { width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 20px; background: var(--grad); color: #fff; display: grid; place-items: center; box-shadow: 0 12px 30px rgba(10, 132, 255, .3); }
+  .hero-logo svg { width: 34px; height: 34px; }
+  .hero h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+  .hero p { margin: 6px auto 0; max-width: 300px; color: var(--text-2); font-size: 14.5px; }
+  .hero .ai-note { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; font-size: 12px; color: var(--text-2); background: var(--bg-2); padding: 5px 10px; border-radius: 99px; }
+
+  .msg { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; animation: entra .45s var(--ease) both; }
+  .msg.yo { justify-content: flex-end; }
+  @keyframes entra { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+  .avatar { width: 28px; height: 28px; border-radius: 9px; background: var(--grad); color: #fff; display: grid; place-items: center; flex: none; margin-top: 4px; }
+  .avatar svg { width: 16px; height: 16px; }
+  .col { display: flex; flex-direction: column; gap: 6px; max-width: 82%; min-width: 0; }
+  .yo .col { align-items: flex-end; }
+  .bubble { padding: 9px 14px; border-radius: 20px; white-space: pre-wrap; word-wrap: break-word; font-size: 15.5px; line-height: 1.38; }
+  .bot .bubble { background: var(--bubble-bot); border-bottom-left-radius: 6px; }
+  .yo .bubble { background: var(--grad); color: #fff; border-bottom-right-radius: 6px; box-shadow: 0 6px 18px rgba(10, 132, 255, .22); }
+
+  .typing { display: inline-flex; gap: 4px; padding: 13px 14px; }
+  .typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); animation: salto 1.2s infinite ease-in-out; }
+  .typing i:nth-child(2) { animation-delay: .15s; } .typing i:nth-child(3) { animation-delay: .3s; }
+  @keyframes salto { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-4px); opacity: 1; } }
+
+  .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; padding: 3px 8px; border-radius: 99px; white-space: nowrap; flex: none; }
+  .pill.warn { color: #b25e00; background: rgba(255, 159, 10, .15); }
+  @media (prefers-color-scheme: dark) { .pill.warn { color: #ffb340; } }
+  .pill svg { width: 13px; height: 13px; }
+
+  /* tarjetas */
+  .card { background: var(--card); border: .5px solid var(--card-border); border-radius: 20px; padding: 14px 16px; box-shadow: var(--shadow); width: 100%; min-width: 250px; }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--text-2); font-weight: 600; }
+  .card-top .dest { display: flex; align-items: center; gap: 5px; text-transform: uppercase; letter-spacing: .04em; font-size: 11.5px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-top .dest svg { width: 13px; height: 13px; }
+  .big { font-size: 38px; font-weight: 700; letter-spacing: -.03em; line-height: 1.05; margin: 8px 0 2px; display: flex; align-items: baseline; gap: 6px; }
+  .big small { font-size: 16px; font-weight: 600; color: var(--text-2); letter-spacing: 0; }
+  .grad-text { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .card-foot { font-size: 12.5px; color: var(--text-2); margin-top: 10px; }
+  .track { position: relative; height: 6px; border-radius: 99px; background: var(--bg-2); margin: 16px 6px 4px; }
+  .track-fill { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: var(--grad); transition: width 1s var(--ease); }
+  .track-bus { position: absolute; top: 50%; width: 26px; height: 26px; margin-left: -13px; transform: translateY(-50%); border-radius: 50%; background: var(--card); box-shadow: 0 2px 8px rgba(0, 0, 0, .18); display: grid; place-items: center; color: var(--accent); transition: left 1s var(--ease); }
+  .track-bus svg { width: 15px; height: 15px; }
+  .track-stop { position: absolute; right: -6px; top: 50%; width: 14px; height: 14px; transform: translateY(-50%); border-radius: 50%; background: var(--card); border: 3px solid var(--accent); }
+  .track-labels { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-3); margin-top: 8px; }
+  .llegando { display: flex; align-items: center; gap: 10px; }
+  .llegando .live { width: 10px; height: 10px; }
+  .times { display: flex; gap: 8px; margin: 10px 0 2px; }
+  .time { flex: 1; text-align: center; padding: 10px 6px; border-radius: 14px; background: var(--bg-2); }
+  .time b { display: block; font-size: 24px; letter-spacing: -.02em; }
+  .time span { font-size: 11.5px; color: var(--text-2); }
+  .time:first-child { background: var(--grad-soft); }
+
+  .card-title { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+  .card-title .ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--grad-soft); color: var(--accent); flex: none; }
+  .card-title .ic svg { width: 18px; height: 18px; }
+  .card-title b { display: block; font-size: 15.5px; }
+  .card-title span { font-size: 12.5px; color: var(--text-2); }
+  .phone { font-size: 26px; font-weight: 700; letter-spacing: -.01em; margin: 12px 0 2px; font-variant-numeric: tabular-nums; }
+  .btns { display: flex; gap: 8px; margin-top: 12px; }
+  .btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 11px 10px; border-radius: 13px; font-weight: 600; font-size: 14.5px; text-decoration: none; background: var(--bg-2); color: var(--text); transition: transform .2s var(--ease); }
+  .btn:active { transform: scale(.97); }
+  .btn svg { width: 17px; height: 17px; }
+  .btn.go { background: var(--grad); color: #fff; }
+  .btn.sos { background: #ff3b30; color: #fff; box-shadow: 0 8px 20px rgba(255, 59, 48, .3); }
+  .card.sos { background: linear-gradient(180deg, rgba(255, 59, 48, .10), transparent 60%), var(--card); border-color: rgba(255, 59, 48, .25); }
+  .card.sos .card-title .ic { background: rgba(255, 59, 48, .14); color: #ff3b30; }
+  .sched { display: grid; gap: 8px; margin-top: 12px; }
+  .sched-row { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 14px; background: var(--bg-2); }
+  .sched-row .dir { flex: 1; min-width: 0; }
+  .sched-row .dir b { display: flex; align-items: center; gap: 5px; font-size: 14px; }
+  .sched-row .dir b svg { width: 14px; height: 14px; color: var(--accent); flex: none; }
+  .sched-row .dir span { font-size: 12.5px; color: var(--text-2); }
+  .sched-row .next { text-align: right; }
+  .sched-row .next b { display: block; font-size: 20px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .sched-row .next span { font-size: 11px; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
+  .hint { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 9px 11px; border-radius: 12px; background: var(--grad-soft); font-size: 13px; }
+  .hint svg { width: 16px; height: 16px; color: var(--accent); flex: none; }
+  .hint b { margin-left: auto; font-variant-numeric: tabular-nums; }
+  .menu { display: grid; margin-top: 8px; }
+  .menu button { display: flex; align-items: center; gap: 12px; padding: 11px 2px; text-align: left; border-top: .5px solid var(--sep); }
+  .menu button:first-child { border-top: 0; }
+  .menu .ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--grad-soft); color: var(--accent); flex: none; }
+  .menu .ic svg { width: 17px; height: 17px; }
+  .menu span { flex: 1; font-size: 14.5px; }
+  .menu .chev { color: var(--text-3); width: 16px; height: 16px; transform: rotate(-90deg); }
+  .big.muted { color: var(--text-2); font-size: 22px; letter-spacing: -.01em; }
+
+  /* acciones bajo un mensaje */
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { padding: 8px 13px; border-radius: 99px; font-size: 14px; font-weight: 500; background: var(--card); border: .5px solid var(--sep); box-shadow: 0 1px 2px rgba(0, 0, 0, .04); white-space: nowrap; transition: transform .2s var(--ease), background .2s; display: inline-flex; align-items: center; gap: 6px; }
+  .chip:active { transform: scale(.95); }
+  .chip svg { width: 15px; height: 15px; color: var(--accent); }
+  .chip.solid { background: var(--grad); color: #fff; border-color: transparent; }
+  .chip.solid svg { color: #fff; }
+
+  .meta { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-3); padding-left: 4px; min-height: 20px; }
+  .stars { display: inline-flex; gap: 1px; }
+  .stars button { width: 22px; height: 22px; display: grid; place-items: center; color: var(--text-3); transition: transform .2s var(--ease), color .2s; }
+  .stars button:hover { transform: scale(1.15); }
+  .stars button.on { color: #ffb800; }
+  .stars svg { width: 15px; height: 15px; }
+  .trace { font: 11px/1.35 ui-monospace, "SF Mono", Menlo, monospace; color: var(--text-2); background: var(--bg-2); border-radius: 10px; padding: 6px 9px; }
+
+  /* barra inferior */
+  .quick { display: flex; gap: 8px; overflow-x: auto; padding: 2px 14px 10px; scrollbar-width: none; }
+  .quick::-webkit-scrollbar { display: none; }
+  .composer { display: flex; align-items: center; gap: 8px; margin: 0 14px; padding: 5px 5px 5px 16px; border-radius: 26px; background: var(--card); border: .5px solid var(--sep); box-shadow: 0 2px 10px rgba(0, 0, 0, .05); }
+  .composer input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 16px; padding: 8px 0; }
+  .composer input::placeholder { color: var(--text-3); }
+  .send { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--grad); color: #fff; transition: transform .25s var(--ease), opacity .2s, filter .2s; flex: none; }
+  .send:disabled { filter: grayscale(1); opacity: .35; cursor: default; }
+  .send:not(:disabled):active { transform: scale(.9); }
+  .send svg { width: 18px; height: 18px; }
+  .legal { margin: 8px 0 0; text-align: center; font-size: 11px; color: var(--text-3); }
+  .legal button { color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; font-size: 11px; }
+
+  /* ---------- hojas inferiores ---------- */
+  .scrim { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, .28); opacity: 0; pointer-events: none; transition: opacity .35s var(--ease); }
+  .scrim.on { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; max-width: 480px; margin: 0 auto; z-index: 21; max-height: 88dvh;
+    display: flex; flex-direction: column;
+    background: var(--bar); -webkit-backdrop-filter: saturate(190%) blur(30px); backdrop-filter: saturate(190%) blur(30px);
+    border-radius: 26px 26px 0 0; border-top: .5px solid var(--bar-border);
+    padding: 8px 18px max(18px, env(safe-area-inset-bottom));
+    transform: translateY(105%); transition: transform .5s var(--ease);
+  }
+  .sheet.on { transform: none; }
+  .grabber { width: 38px; height: 5px; border-radius: 99px; background: var(--text-3); opacity: .5; margin: 0 auto 12px; flex: none; }
+  .sheet h2 { margin: 0 0 14px; font-size: 20px; font-weight: 700; letter-spacing: -.02em; outline: none; }
+  .sheet p { color: var(--text-2); font-size: 14.5px; margin: 0 0 12px; }
+
+  .seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 12px; background: rgba(118, 118, 128, .14); margin-bottom: 14px; flex: none; }
+  .seg button { position: relative; z-index: 1; padding: 8px 4px; font-size: 13.5px; font-weight: 600; border-radius: 9px; color: var(--text-2); transition: color .25s; display: flex; align-items: center; justify-content: center; gap: 5px; }
+  .seg button svg { width: 14px; height: 14px; }
+  .seg button[aria-pressed="true"] { color: var(--text); }
+  .seg .thumb { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 9px; background: var(--card); box-shadow: 0 3px 8px rgba(0, 0, 0, .12), 0 0 0 .5px rgba(0, 0, 0, .04); transition: transform .4s var(--ease), opacity .2s; }
+  .seg .thumb.off { opacity: 0; }
+
+  .stops { list-style: none; margin: 0 -6px; padding: 0; overflow-y: auto; position: relative; flex: 1; min-height: 0; }
+  .stops li { position: relative; }
+  .stops li::before { content: ""; position: absolute; left: 21px; top: 0; bottom: 0; width: 2px; background: var(--sep); }
+  .stops li:first-child::before { top: 50%; } .stops li:last-child::before { bottom: 50%; }
+  .stops button { position: relative; width: 100%; display: flex; align-items: center; gap: 14px; padding: 10px 10px 10px 15px; border-radius: 12px; text-align: left; transition: background .2s; }
+  .stops button:hover { background: rgba(118, 118, 128, .08); }
+  .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--bg); border: 2px solid var(--text-3); flex: none; position: relative; z-index: 1; transition: all .3s var(--ease); }
+  .stops .name { flex: 1; font-size: 15.5px; }
+  .stops .tag { font-size: 11px; font-weight: 600; color: var(--text-2); background: var(--bg-2); padding: 2px 7px; border-radius: 99px; }
+  .stops button[aria-pressed="true"] { background: var(--grad-soft); }
+  .stops button[aria-pressed="true"] .name { font-weight: 650; }
+  .stops button[aria-pressed="true"] .dot { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 0 4px rgba(10, 132, 255, .2); }
+  .primary { margin-top: 14px; width: 100%; padding: 14px; border-radius: 14px; background: var(--grad); color: #fff; font-weight: 650; font-size: 16px; flex: none; transition: transform .2s var(--ease), opacity .2s; }
+  .primary:active { transform: scale(.98); }
+  .primary:disabled { opacity: .4; }
+  .info-list { display: grid; gap: 10px; margin-bottom: 4px; }
+  .info-item { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: 14px; background: var(--card); border: .5px solid var(--card-border); }
+  .info-item .ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--grad-soft); color: var(--accent); flex: none; }
+  .info-item .ic svg { width: 17px; height: 17px; }
+  .info-item b { display: block; font-size: 14.5px; }
+  .info-item span { font-size: 13px; color: var(--text-2); }
+  .link { display: block; text-align: center; margin-top: 12px; font-size: 13px; color: var(--accent); text-decoration: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="ambient" aria-hidden="true"><i></i><i></i></div>
+
+  <header class="bar top" id="top">
+    <div class="row">
+      <div class="brand">
+        <div class="logo" data-icon="bus"></div>
+        <div>
+          <h1>SmartBus</h1>
+          <p class="sub"><span class="live"></span>Asistente con IA · en línea</p>
+        </div>
+      </div>
+      <button class="icon-btn" id="infoBtn" aria-label="Información y privacidad" data-icon="info"></button>
+    </div>
+    <button class="trip" id="tripBtn" aria-haspopup="dialog">
+      <span class="pin" data-icon="pin"></span>
+      <span class="trip-text"><b id="tripParada">Elegí tu parada</b><span id="tripSentido">y hacia dónde vas</span></span>
+      <span data-icon="chevron"></span>
+    </button>
+  </header>
+
+  <main class="chat" id="chat" aria-live="polite"></main>
+
+  <footer class="bar bottom" id="bottom">
+    <div class="quick" id="rapidas"></div>
+    <form class="composer" id="form">
+      <input id="texto" placeholder="Preguntá por tu bus…" maxlength="300" autocomplete="off" aria-label="Tu consulta">
+      <button class="send" id="enviar" aria-label="Enviar" disabled data-icon="up"></button>
+    </form>
+    <p class="legal">Es una IA y puede equivocarse · Emergencias: 911 · <button type="button" id="privBtn">Privacidad</button></p>
+  </footer>
+
+  <div class="scrim" id="scrim"></div>
+
+  <section class="sheet" id="tripSheet" role="dialog" aria-modal="true" aria-labelledby="tripTitle">
+    <div class="grabber"></div>
+    <h2 id="tripTitle" tabindex="-1">Tu viaje</h2>
+    <div class="seg" id="seg"><span class="thumb off" id="thumb"></span></div>
+    <ol class="stops" id="stops"></ol>
+    <button class="primary" id="listo">Listo</button>
+  </section>
+
+  <section class="sheet" id="infoSheet" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+    <div class="grabber"></div>
+    <h2 id="infoTitle" tabindex="-1">Sobre SmartBus</h2>
+    <div class="info-list">
+      <div class="info-item"><span class="ic" data-icon="spark"></span><div><b>Soy una IA de apoyo</b><span>Los tiempos son estimaciones con datos GPS y pueden variar por el tráfico. Si no tengo datos, te lo digo.</span></div></div>
+      <div class="info-item"><span class="ic" data-icon="shield"></span><div><b>Tu privacidad</b><span>No te pido tu nombre ni guardo tu ubicación ni tus mensajes. Solo registramos de forma anónima el tipo de consulta y tu valoración.</span></div></div>
+      <div class="info-item"><span class="ic" data-icon="phone"></span><div><b>Emergencias</b><span>Ante un accidente o emergencia llamá al 911. Te paso con una persona de la empresa.</span></div></div>
+    </div>
+    <a class="link" href="/demo">Panel de demostración</a>
+    <button class="primary" id="infoOk">Entendido</button>
+  </section>
+</div>
+
+<script>
+const ICONS = {
+  bus: '<rect x="4" y="3" width="16" height="15" rx="3"/><path d="M4 11h16M8 18v2.5M16 18v2.5"/><circle cx="8" cy="14.5" r=".9" fill="currentColor"/><circle cx="16" cy="14.5" r=".9" fill="currentColor"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.8h.01"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  chevron: '<path d="m7 10 5 5 5-5"/>',
+  up: '<path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/>',
+  right: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  left: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
+  star: '<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" fill="currentColor" stroke="none"/>',
+  alert: '<path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.3h.01"/>',
+  person: '<circle cx="12" cy="8" r="3.6"/><path d="M5 20c.8-3.6 3.6-5.6 7-5.6s6.2 2 7 5.6"/>',
+  spark: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>',
+  shield: '<path d="M12 3 5 6v5.5c0 4.4 3 8 7 9.5 4-1.5 7-5.1 7-9.5V6z"/><path d="m9 12 2 2 4-4"/>',
+  phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  route: '<circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.5"/>',
+  calendar: '<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  wifi_off: '<path d="M3 3l18 18M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 5-2.7M14.5 10.4A10 10 0 0 1 19 13M2 9.5a15 15 0 0 1 4.5-2.9M11 5.1a15 15 0 0 1 11 4.4"/><circle cx="12" cy="20" r=".9" fill="currentColor"/>',
+};
+const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
+document.querySelectorAll('[data-icon]').forEach(e => e.insertAdjacentHTML('beforeend', icon(e.dataset.icon)));
+
+const $ = (s) => document.querySelector(s);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+
+const app = $('#app'), chat = $('#chat'), texto = $('#texto'), enviar = $('#enviar');
+const TRAZA = new URLSearchParams(location.search).has('traza');
+const historial = [];   // memoria corta de la conversación (solo vive en esta pestaña)
+let paradas = [], sentidos = [];
+let parada = store.get('parada'), sentido = store.get('sentido');
+let esperando = false;
+let ultimaAyuda = 0;     // para no repetir la tarjeta de ayuda en cada mensaje  // el asistente pidió parada o sentido y hay que repetir la consulta
+
+// Las barras son translúcidas: el chat ocupa toda la pantalla y se rellena con su altura.
+const medirBarras = new ResizeObserver(() => {
+  app.style.setProperty('--top-h', $('#top').offsetHeight + 'px');
+  app.style.setProperty('--bottom-h', $('#bottom').offsetHeight + 'px');
+});
+medirBarras.observe($('#top')); medirBarras.observe($('#bottom'));
+
+const abajo = () => requestAnimationFrame(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }));
+
+/* ---------- estado del viaje ---------- */
+const nombreParada = (id) => (paradas.find(p => p.id === id) || {}).nombre;
+const sentidoInfo = (id) => sentidos.find(s => s.id === id);
+
+function pintarViaje() {
+  $('#tripParada').textContent = nombreParada(parada) || 'Elegí tu parada';
+  const s = sentidoInfo(sentido);
+  $('#tripSentido').innerHTML = '';
+  if (s) { $('#tripSentido').insertAdjacentHTML('beforeend', icon(s.id === 'ida' ? 'right' : 'left')); $('#tripSentido').append(s.nombre); }
+  else $('#tripSentido').textContent = 'y hacia dónde vas';
+  pintarHoja();
+}
+
+function pintarHoja() {
+  const seg = $('#seg');
+  seg.querySelectorAll('button').forEach(b => b.remove());
+  sentidos.forEach((s, i) => {
+    const b = el('button'); b.type = 'button'; b.setAttribute('aria-pressed', s.id === sentido);
+    b.insertAdjacentHTML('beforeend', icon(s.id === 'ida' ? 'right' : 'left')); b.append(s.nombre);
+    b.onclick = () => elegirSentido(s.id);
+    seg.appendChild(b);
+  });
+  const i = sentidos.findIndex(s => s.id === sentido);
+  $('#thumb').classList.toggle('off', i < 0);
+  $('#thumb').style.transform = `translateX(${Math.max(i, 0) * 100}%)`;
+
+  // La lista se ordena en el sentido de la marcha.
+  const lista = sentido === 'vuelta' ? [...paradas].reverse() : paradas;
+  const ol = $('#stops'); ol.innerHTML = '';
+  lista.forEach((p, i) => {
+    const li = el('li'), b = el('button'); b.type = 'button';
+    b.setAttribute('aria-pressed', p.id === parada);
+    b.append(el('span', 'dot'), el('span', 'name', p.nombre));
+    if (p.id === paradas[0].id || p.id === paradas[paradas.length - 1].id) b.append(el('span', 'tag', 'Terminal'));
+    b.onclick = () => elegirParada(p.id);
+    li.appendChild(b); ol.appendChild(li);
+  });
+  $('#listo').disabled = !(parada && sentido);
+}
+
+function elegirParada(id) {
+  parada = id; store.set('parada', id);
+  // En las terminales hay un solo sentido posible.
+  if (id === paradas[0]?.id) elegirSentido('ida', true);
+  if (id === paradas[paradas.length - 1]?.id) elegirSentido('vuelta', true);
+  pintarViaje();
+}
+function elegirSentido(id, silencioso) {
+  sentido = id; store.set('sentido', id);
+  if (!silencioso) pintarViaje();
+}
+
+/* ---------- hojas ---------- */
+let hojaAbierta = null;
+function abrir(id) {
+  hojaAbierta = $(id); hojaAbierta.classList.add('on'); $('#scrim').classList.add('on');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => hojaAbierta && hojaAbierta.querySelector('h2').focus({ preventScroll: true }), 300);
+}
+function cerrar() {
+  if (!hojaAbierta) return;
+  hojaAbierta.classList.remove('on'); $('#scrim').classList.remove('on'); hojaAbierta = null;
+  document.body.style.overflow = '';
+}
+$('#tripBtn').onclick = () => abrir('#tripSheet');
+$('#infoBtn').onclick = $('#privBtn').onclick = () => abrir('#infoSheet');
+$('#infoOk').onclick = cerrar;
+$('#scrim').onclick = cerrar;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrar(); });
+$('#listo').onclick = () => {
+  cerrar();
+  if (esperando && parada && sentido) { esperando = false; preguntar('¿Cuánto falta para mi bus?'); }
+};
+
+/* ---------- mensajes ---------- */
+function mensajeYo(t) {
+  const m = el('div', 'msg yo'), c = el('div', 'col');
+  c.appendChild(el('div', 'bubble', t)); m.appendChild(c); chat.appendChild(m); abajo();
+}
+function mensajeBot() {
+  const m = el('div', 'msg bot'), av = el('div', 'avatar'), c = el('div', 'col');
+  av.innerHTML = icon('bus'); m.append(av, c); chat.appendChild(m);
+  const b = el('div', 'bubble typing'); b.innerHTML = '<i></i><i></i><i></i>'; c.appendChild(b);
+  abajo();
+  return { col: c, bubble: b };
+}
+
+function boton(cls, ic, texto, href) {
+  const b = el(href ? 'a' : 'button', 'btn ' + cls);
+  if (href) b.href = href; else b.type = 'button';
+  b.insertAdjacentHTML('beforeend', icon(ic)); b.append(texto); return b;
+}
+function titulo(ic, t, sub) {
+  const d = el('div', 'card-title'), i = el('span', 'ic'), tx = el('div');
+  i.innerHTML = icon(ic); tx.append(el('b', null, t)); if (sub) tx.append(el('span', null, sub));
+  d.append(i, tx); return d;
+}
+function cabecera(t) {
+  const top = el('div', 'card-top'), dest = el('span', 'dest');
+  dest.insertAdjacentHTML('beforeend', icon('bus')); dest.append('Hacia ' + t.destino);
+  top.appendChild(dest); return top;
+}
+const tel = (n) => 'tel:' + n.replace(/\D/g, '');
+
+function tarjeta(t) {
+  const c = el('div', 'card');
+
+  if (t.tipo === 'emergencia') {
+    c.classList.add('sos');
+    c.append(titulo('alert', 'Emergencia', 'Si alguien está en peligro, llamá ya'));
+    const b = el('div', 'btns');
+    b.append(boton('sos', 'phone', 'Llamar al 911', 'tel:911'));
+    c.append(b);
+    const b2 = el('div', 'btns');
+    b2.append(boton('', 'person', 'Empresa · ' + t.contacto.telefono, tel(t.contacto.telefono)));
+    c.append(b2);
+    return c;
+  }
+
+  if (t.tipo === 'contacto') {
+    const motivos = {
+      sin_datos: ['wifi_off', 'Sin datos en tiempo real', 'Para esa consulta te ayuda una persona'],
+      sin_servicio: ['calendar', 'Sin más salidas hoy', 'Consultá opciones con la empresa'],
+      atencion: ['person', 'Atención al cliente', 'Te atiende una persona de la empresa'],
+    };
+    const [ic, tt, sub] = motivos[t.motivo] || motivos.atencion;
+    c.append(titulo(ic, tt, sub));
+    c.append(el('div', 'phone', t.contacto.telefono));
+    c.append(el('div', 'card-foot', t.contacto.nombre));
+    const b = el('div', 'btns'), copiar = boton('', 'copy', 'Copiar');
+    copiar.onclick = async () => {
+      try { await navigator.clipboard.writeText(t.contacto.telefono); copiar.innerHTML = icon('check') + 'Copiado'; } catch (e) {}
+    };
+    b.append(boton('go', 'phone', 'Llamar', tel(t.contacto.telefono)), copiar);
+    c.append(b);
+    return c;
+  }
+
+  if (t.tipo === 'horario') {
+    c.append(titulo('calendar', 'Horario de la ruta', `Salidas cada ${t.frecuencia_min} minutos`));
+    const g = el('div', 'sched');
+    t.sentidos.forEach(s => {
+      const r = el('div', 'sched-row'), dir = el('div', 'dir'), nx = el('div', 'next');
+      const tt = el('b'); tt.append(s.origen); tt.insertAdjacentHTML('beforeend', icon('right')); tt.append(s.destino);
+      dir.append(tt, el('span', null, `Primera ${s.primera} · Última ${s.ultima}`));
+      nx.append(el('b', null, s.proxima || '—'), el('span', null, s.proxima ? 'próxima' : 'sin salidas'));
+      r.append(dir, nx); g.append(r);
+    });
+    c.append(g);
+    return c;
+  }
+
+  if (t.tipo === 'ayuda') {
+    c.append(titulo('spark', 'Puedo ayudarte con', 'Tocá una opción'));
+    const m = el('div', 'menu');
+    [['bus', 'Cuánto falta para mi bus', '¿Cuánto falta para mi bus?'],
+     ['clock', 'A qué hora pasa por mi parada', '¿A qué hora pasa por mi parada?'],
+     ['calendar', 'Horarios de la ruta', '¿Cuáles son los horarios?'],
+     ['person', 'Contacto de la empresa', 'Necesito el contacto de la empresa']].forEach(([ic, t2, q]) => {
+      const b = el('button'); b.type = 'button';
+      const i = el('span', 'ic'); i.innerHTML = icon(ic);
+      b.append(i, el('span', null, t2)); b.insertAdjacentHTML('beforeend', icon('chevron').replace('<svg', '<svg class="chev"'));
+      b.onclick = () => preguntar(q); m.append(b);
+    });
+    c.append(m);
+    return c;
+  }
+
+  const top = cabecera(t);
+  if (t.tipo === 'eta' && t.confianza === 'baja') {
+    const w = el('span', 'pill warn'); w.insertAdjacentHTML('beforeend', icon('alert')); w.append('Dato antiguo'); top.appendChild(w);
+  }
+  c.appendChild(top);
+
+  if (t.tipo === 'eta') {
+    if (t.llegando) {
+      const big = el('div', 'big llegando'); big.append(el('span', 'live'), el('span', 'grad-text', 'Llegando'));
+      c.appendChild(big);
+      c.appendChild(el('div', 'card-foot', `A ${t.parada} · Dato de las ${t.hora_dato}`));
+    } else {
+      const big = el('div', 'big'); big.append(el('span', 'grad-text', `${t.eta[0]}–${t.eta[1]}`), el('small', null, 'min'));
+      c.appendChild(big);
+      // Qué tan cerca viene: 15 km o más = al inicio de la barra.
+      const pct = Math.min(94, Math.max(6, (1 - t.distancia_km / 15) * 100));
+      const tr = el('div', 'track'), fill = el('div', 'track-fill'), bus = el('div', 'track-bus');
+      bus.innerHTML = icon('bus'); fill.style.width = '0%'; bus.style.left = '0%';
+      tr.append(fill, bus, el('div', 'track-stop')); c.appendChild(tr);
+      setTimeout(() => { fill.style.width = pct + '%'; bus.style.left = pct + '%'; }, 80);
+      const lab = el('div', 'track-labels'); lab.append(el('span', null, `a ${t.distancia_km} km`), el('span', null, t.parada));
+      c.appendChild(lab);
+      c.appendChild(el('div', 'card-foot', `Estimación con el dato GPS de las ${t.hora_dato}`));
+      if (t.sugerir_siguiente && t.siguiente) {
+        const h = el('div', 'hint'); h.innerHTML = icon('clock');
+        h.append(el('span', null, `Siguiente salida de ${t.origen}`), el('b', null, t.siguiente)); c.appendChild(h);
+      }
+    }
+  } else if (t.tipo === 'pasado') {
+    const big = el('div', 'big'); big.append(el('span', null, `Pasó hace ~${t.hace_min}`), el('small', null, 'min'));
+    big.style.fontSize = '30px'; c.appendChild(big);
+    c.appendChild(el('div', 'card-foot', `Por ${t.parada}`));
+    if (t.siguiente) {
+      const h = el('div', 'hint'); h.innerHTML = icon('clock');
+      h.append(el('span', null, `Siguiente salida de ${t.origen}`), el('b', null, t.siguiente)); c.appendChild(h);
+    }
+  } else if (t.tipo === 'sin_bus') {
+    c.appendChild(el('div', 'big muted', 'Ningún bus en camino'));
+    c.appendChild(el('div', 'card-foot', `Por ahora no hay buses acercándose a ${t.parada}`));
+    if (t.siguiente) {
+      const h = el('div', 'hint'); h.innerHTML = icon('clock');
+      h.append(el('span', null, `Siguiente salida de ${t.origen}`), el('b', null, t.siguiente)); c.appendChild(h);
+    }
+  } else if (t.tipo === 'pasos') {
+    const times = el('div', 'times');
+    t.pasos.forEach((h, i) => { const d = el('div', 'time'); d.append(el('b', null, h), el('span', null, i === 0 ? 'próximo' : 'siguiente')); times.appendChild(d); });
+    c.appendChild(times);
+    c.appendChild(el('div', 'card-foot', `Paso aproximado por ${t.parada}, según el horario`));
+  }
+  return c;
+}
+
+function calificar(col, id) {
+  const meta = el('div', 'meta'), st = el('span', 'stars');
+  meta.append('¿Te sirvió?', st);
+  for (let i = 1; i <= 5; i++) {
+    const b = el('button'); b.type = 'button'; b.innerHTML = icon('star'); b.setAttribute('aria-label', `${i} de 5`);
+    b.onmouseenter = () => st.querySelectorAll('button').forEach((x, j) => x.classList.toggle('on', j < i));
+    b.onclick = async () => {
+      st.querySelectorAll('button').forEach((x, j) => x.classList.toggle('on', j < i));
+      st.onmouseleave = null;
+      try { await fetch('/api/valoracion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, valor: i }) }); } catch (e) {}
+      meta.textContent = '¡Gracias por tu valoración!';
+    };
+    st.appendChild(b);
+  }
+  st.onmouseleave = () => st.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+  col.appendChild(meta);
+}
+
+async function preguntar(msg) {
+  msg = msg.trim(); if (!msg) return;
+  mensajeYo(msg); texto.value = ''; enviar.disabled = true;
+  const { col, bubble } = mensajeBot();
+  try {
+    const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mensaje: msg, parada, sentido, historial: historial.slice(-6) }) });
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    bubble.classList.remove('typing'); bubble.textContent = d.respuesta;
+    historial.push({ rol: 'usuario', texto: msg }, { rol: 'asistente', texto: d.respuesta });
+    if (d.parada && d.parada !== parada) { parada = d.parada; store.set('parada', parada); }
+    if (d.sentido && d.sentido !== sentido) { sentido = d.sentido; store.set('sentido', sentido); }
+    pintarViaje();
+
+    if (d.tarjeta && !(d.tarjeta.tipo === 'ayuda' && Date.now() - ultimaAyuda < 90000)) {
+      if (d.tarjeta.tipo === 'ayuda') ultimaAyuda = Date.now();
+      col.appendChild(tarjeta(d.tarjeta));
+    }
+    if (d.pedir) {
+      esperando = true;
+      const a = el('div', 'actions');
+      if (d.pedir === 'parada') {
+        const b = el('button', 'chip solid'); b.type = 'button'; b.insertAdjacentHTML('beforeend', icon('pin')); b.append('Elegir parada');
+        b.onclick = () => abrir('#tripSheet'); a.appendChild(b);
+      } else {
+        sentidos.forEach(s => {
+          const b = el('button', 'chip'); b.type = 'button'; b.insertAdjacentHTML('beforeend', icon(s.id === 'ida' ? 'right' : 'left')); b.append(s.nombre);
+          b.onclick = () => { elegirSentido(s.id); if (parada) { esperando = false; preguntar('¿Cuánto falta para mi bus?'); } };
+          a.appendChild(b);
+        });
+      }
+      col.appendChild(a);
+    }
+    calificar(col, d.id);
+    if (TRAZA && d.traza) {
+      const t = d.traza;
+      col.appendChild(el('div', 'trace', `modelo: ${t.modelo}\n1 recepción: ${t.recepcion}${t.llm_consultado ? ' (IA consultada)' : ''} → ${t.categoria}\n2 ubicación: ${t.ubicacion} · 3 respuesta: ${t.respuesta} · ${d.tiempo_ms} ms`));
+      col.lastChild.style.whiteSpace = 'pre-wrap';
+    }
+  } catch (e) {
+    bubble.classList.remove('typing'); bubble.textContent = 'No pude conectarme. Revisá tu conexión e intentá de nuevo.';
+  }
+  abajo(); texto.focus();
+}
+
+$('#form').onsubmit = (e) => { e.preventDefault(); preguntar(texto.value); };
+texto.addEventListener('input', () => { enviar.disabled = !texto.value.trim(); });
+
+['¿Cuánto falta para mi bus?', '¿Ya pasó el bus?', '¿A qué hora pasa por mi parada?', 'Horarios'].forEach(t => {
+  const b = el('button', 'chip', t); b.type = 'button'; b.onclick = () => preguntar(t); $('#rapidas').appendChild(b);
+});
+
+fetch('/api/paradas').then(r => r.json()).then(d => {
+  paradas = d.paradas; sentidos = d.sentidos;
+  if (!paradas.some(p => p.id === parada)) parada = null;
+  if (!sentidos.some(s => s.id === sentido)) sentido = null;
+  const hero = el('div', 'hero');
+  const lg = el('div', 'hero-logo'); lg.innerHTML = icon('bus');
+  const note = el('span', 'ai-note'); note.insertAdjacentHTML('beforeend', icon('spark')); note.append('Asistente con IA · respuestas en segundos');
+  note.querySelector('svg').style.cssText = 'width:13px;height:13px';
+  hero.append(lg, el('h2', null, 'Hola, soy SmartBus'),
+    el('p', null, `Te digo dónde viene tu bus y cuánto falta en la ruta ${paradas[0].nombre} – ${paradas[paradas.length - 1].nombre}.`), note);
+  chat.appendChild(hero);
+  pintarViaje();
+});
+</script>
+</body>
+</html>

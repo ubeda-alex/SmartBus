@@ -1,0 +1,42 @@
+{
+  "ruta_piloto": "fortuna-quesada",
+  "contacto": {
+    "nombre": "Central de la empresa (contacto de ejemplo)",
+    "telefono": "2550-0000"
+  },
+  "rutas": {
+    "fortuna-quesada": {
+      "nombre": "La Fortuna–Ciudad Quesada",
+      "alias": ["fortuna", "quesada", "san carlos"],
+      "longitud_km": 52.0,
+      "frecuencia_min": 40,
+      "velocidad_programada_kmh": 45,
+      "sentidos": {
+        "ida":    {"origen": "La Fortuna",      "destino": "Ciudad Quesada", "primera": "05:00", "ultima": "20:00"},
+        "vuelta": {"origen": "Ciudad Quesada",  "destino": "La Fortuna",     "primera": "05:30", "ultima": "20:30"}
+      },
+      "paradas": [
+        {"id": "fortuna",     "nombre": "La Fortuna",        "km": 0.0,  "alias": ["la fortuna", "fortuna"]},
+        {"id": "tanque",      "nombre": "El Tanque",         "km": 7.5,  "alias": ["el tanque", "tanque"]},
+        {"id": "angeles",     "nombre": "Los Ángeles",       "km": 10.5, "alias": ["los angeles"]},
+        {"id": "perla",       "nombre": "La Perla",          "km": 14.0, "alias": ["la perla"]},
+        {"id": "bonanza",     "nombre": "Bonanza",           "km": 18.0, "alias": ["bonanza"]},
+        {"id": "ulima",       "nombre": "Ulima",             "km": 22.0, "alias": ["ulima"]},
+        {"id": "vega",        "nombre": "La Vega",           "km": 26.5, "alias": ["la vega"]},
+        {"id": "molino",      "nombre": "El Molino",         "km": 31.0, "alias": ["el molino"]},
+        {"id": "javillos",    "nombre": "Javillos",          "km": 35.0, "alias": ["javillos", "jabillos"]},
+        {"id": "santa-clara", "nombre": "Santa Clara Centro","km": 40.0, "alias": ["santa clara"]},
+        {"id": "tec",         "nombre": "TEC San Carlos",    "km": 42.0, "alias": ["tec", "san carlos"]},
+        {"id": "florencia",   "nombre": "Florencia",         "km": 47.0, "alias": ["florencia"]},
+        {"id": "quesada",     "nombre": "Ciudad Quesada",    "km": 52.0, "alias": ["ciudad quesada", "quesada"]}
+      ]
+    }
+  },
+  "rutas_sin_datos": [
+    {"nombre": "Ciudad Quesada–Zarcero", "alias": ["zarcero"]},
+    {"nombre": "La Fortuna–Arenal", "alias": ["arenal"]},
+    {"nombre": "San José–Ciudad Quesada", "alias": ["san jose"]},
+    {"nombre": "Ciudad Quesada–Pital", "alias": ["pital"]},
+    {"nombre": "Ciudad Quesada–Alajuela", "alias": ["alajuela"]}
+  ]
+}
